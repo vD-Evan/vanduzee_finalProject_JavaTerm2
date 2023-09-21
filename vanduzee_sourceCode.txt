@@ -1,0 +1,2966 @@
+package vanduzee.controllers.assignmentControllers;
+
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.scene.control.DatePicker;
+import javafx.scene.control.TextField;
+import vanduzee.models.objectManagement.createObject.CreateAssignment;
+import vanduzee.models.utility.ManageConsole;
+import vanduzee.models.utility.StageManagement;
+import vanduzee.models.validation.DateValidator;
+import vanduzee.models.validation.DoubleValidator;
+import vanduzee.models.validation.StringValidator;
+
+public class AddAssignmentController {
+
+    @FXML
+    private DatePicker dp_date;
+
+    @FXML
+    private TextField txt_marks;
+
+    @FXML
+    private TextField txt_name;
+
+    @FXML
+    private TextField txt_weight;
+
+    @FXML
+    void cancelAdd(ActionEvent event) {
+        StageManagement.closeScreen(event);
+    }
+
+    @FXML
+    void confirmAdd(ActionEvent event) {
+
+        if (!StringValidator.checkAssignmentName(txt_name.getText())) {
+            ManageConsole.printS("name validation failed");
+            return;
+        }
+
+        if (!DoubleValidator.checkTotal(txt_marks.getText())) {
+            ManageConsole.printS("marks validation failed");
+            return;
+        }
+
+        if (!DateValidator.check(dp_date.getValue())) {
+            ManageConsole.printS("date validation failed");
+            return;
+        }
+
+        if (!DoubleValidator.checkWeight(txt_weight.getText())) {
+            ManageConsole.printS("weight validation failed");
+            return;
+        }
+
+        CreateAssignment.newAssignment(txt_name.getText(), txt_marks.getText(), dp_date.getValue(),
+                txt_weight.getText());
+        StageManagement.closeScreen(event);
+    }
+
+}
+
+package vanduzee.controllers.assignmentControllers;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.scene.control.DatePicker;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import vanduzee.models.objectManagement.modifyObject.ModifyAssignment;
+import vanduzee.models.objectManagement.objectUtils.Remove;
+import vanduzee.models.utility.ManageConsole;
+import vanduzee.models.utility.StageManagement;
+import vanduzee.models.utility.VariableConversions;
+import vanduzee.models.validation.DateValidator;
+import vanduzee.models.validation.DisplayMessage;
+import vanduzee.models.validation.DoubleValidator;
+import vanduzee.models.validation.StringValidator;
+import vanduzee.objects.Assignment;
+import vanduzee.objects.MasterList;
+import vanduzee.objects.Student;
+
+public class ViewAssignmentController {
+    Assignment selectedAssignment;
+
+    public void setAssignment(Assignment assignment) {
+        selectedAssignment = assignment;
+        updateAll();
+    }
+
+    @FXML
+    private DatePicker dp_date;
+
+    @FXML
+    private Label lbl_submission;
+
+    @FXML
+    private TextField txt_marks;
+
+    @FXML
+    private TextField txt_name;
+
+    @FXML
+    private TextField txt_weight;
+
+    @FXML
+    void confirmChanges(ActionEvent event) {
+        String newName;
+        String displayName;
+        double newTotal;
+        String displayTotal;
+        LocalDate newDate;
+        String displayDate;
+        double newWeight;
+        String displayWeight;
+
+        if (!StringValidator.checkAssignmentName(txt_name.getText(), selectedAssignment)) {
+            ManageConsole.printS("name validation failed");
+            return;
+        } else {
+            newName = txt_name.getText();
+            displayName = ModifyAssignment.stringName(txt_name.getText());
+        }
+
+        if (!DoubleValidator.checkTotal(txt_marks.getText())) {
+            ManageConsole.printS("marks validation failed");
+            return;
+        } else {
+            newTotal = ModifyAssignment.doubleTotal(txt_marks.getText());
+            displayTotal = ModifyAssignment.stringTotal(txt_marks.getText());
+        }
+
+        if (!DateValidator.check(dp_date.getValue())) {
+            ManageConsole.printS("date validation failed");
+            return;
+        } else {
+            newDate = ModifyAssignment.localDateDue(dp_date.getValue());
+            displayDate = ModifyAssignment.stringDate(dp_date.getValue());
+        }
+
+        if (!DoubleValidator.checkWeight(txt_weight.getText())) {
+            ManageConsole.printS("weight validation failed");
+            return;
+        } else {
+            newWeight = ModifyAssignment.doubleWeight(txt_weight.getText());
+            displayWeight = ModifyAssignment.stringWeight(txt_weight.getText());
+        }
+
+        String header = "Warning: Updating Assignment";
+        String content = "This will update " + selectedAssignment.getName() + " to reflect the following:\n";
+        content += displayName + displayTotal + displayDate + displayWeight;
+
+        if (DisplayMessage.confirm(header, content)) {
+            ModifyAssignment.updateMasterAssignment(selectedAssignment, newName, newTotal, newDate, newWeight);
+            updateAll();
+        }
+
+    }
+
+    @FXML
+    void goBack(ActionEvent event) {
+        StageManagement.closeScreen(event);
+    }
+
+    @FXML
+    void removeAssignment(ActionEvent event) {
+
+        String header = "Warning: Removing Assignment";
+        String content = "This will permanently remove " + selectedAssignment.getName()
+                + " from all students. Are you certain you wish to proceed?";
+        if (DisplayMessage.confirm(header, content)) {
+            Remove.rmAssignment(selectedAssignment);
+            StageManagement.closeScreen(event);
+        }
+    }
+
+    private void updateAll() {
+        txt_name.setText(selectedAssignment.getName());
+        txt_marks.setText(VariableConversions.doubleToString(selectedAssignment.getTotal()));
+        dp_date.setValue(selectedAssignment.getDateDue());
+        txt_weight.setText(VariableConversions.doubleToString(selectedAssignment.getWeight() * 100));
+
+        MasterList master = MasterList.getInstance();
+        if (master.getMasterStudents() == null || master.getMasterStudents().isEmpty()) {
+            lbl_submission.setText("N / A");
+        } else {
+            String studentCount = VariableConversions.intToString(master.getMasterStudents().size());
+            String submitCount = cycleStudents(master);
+            lbl_submission.setText(submitCount + " / " + studentCount);
+        }
+    }
+
+    private String cycleStudents(MasterList master) {
+        int submitCounter = 0;
+        ArrayList<Student> students = master.getMasterStudents();
+        for (Student student : students) {
+            ArrayList<Assignment> assignments = student.getAssignments();
+            for (Assignment assignment : assignments) {
+                submitCounter += checkAssignment(assignment);
+            }
+        }
+        String returnSubmit = VariableConversions.intToString(submitCounter);
+        return returnSubmit;
+    }
+
+    private int checkAssignment(Assignment assignment) {
+        if (!assignment.getName().equals(selectedAssignment.getName())) {
+            return 0;
+        }
+        if (assignment.getScore() == -1) {
+            return 0;
+        }
+        return 1;
+    }
+
+}
+
+package vanduzee.controllers.studentControllers;
+
+/* #region imports */
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.scene.control.TextField;
+import vanduzee.models.objectManagement.createObject.CreateStudent;
+import vanduzee.models.utility.StageManagement;
+import vanduzee.models.validation.IntegerValidator;
+import vanduzee.models.validation.StringValidator;
+/* #endregion */
+
+public class AddStudentController {
+
+    /* #region fxml variables */
+    @FXML
+    private TextField txt_id;
+
+    @FXML
+    private TextField txt_name;
+    /* #endregion */
+
+    /* #region buttons */
+    @FXML
+    void cancelAdd(ActionEvent event) {
+        StageManagement.closeScreen(event);
+    }
+
+    @FXML
+    void confirmAdd(ActionEvent event) {
+        if (!StringValidator.checkStudentName(txt_name.getText())) {
+            return;
+        }
+        if (!IntegerValidator.checkId(txt_id.getText())) {
+            return;
+        }
+
+        String newName = txt_name.getText();
+        int newId = Integer.parseInt(txt_id.getText());
+
+        CreateStudent.newStudent(newName, newId);
+        StageManagement.closeScreen(event);
+    }
+    /* #endregion */
+
+}
+
+package vanduzee.controllers.studentControllers;
+
+import java.time.LocalDate;
+
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.scene.control.DatePicker;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import vanduzee.models.objectManagement.studentSubmission.SubmitAssignment;
+import vanduzee.models.utility.ManageConsole;
+import vanduzee.models.utility.StageManagement;
+import vanduzee.models.utility.VariableConversions;
+import vanduzee.models.validation.DateValidator;
+import vanduzee.models.validation.DoubleValidator;
+import vanduzee.objects.Assignment;
+import vanduzee.objects.Student;
+
+public class StudentAssignmentController {
+    Student selectedStudent;
+    Assignment selectedAssignment;
+
+    public void setAssignment(Assignment assignment, Student student) {
+        selectedAssignment = assignment;
+        selectedStudent = student;
+        updateLabels();
+    }
+
+    @FXML
+    private DatePicker dp_date;
+
+    @FXML
+    private Label lbl_date;
+
+    @FXML
+    private Label lbl_final;
+
+    @FXML
+    private Label lbl_late;
+
+    @FXML
+    private Label lbl_name;
+
+    @FXML
+    private Label lbl_total;
+
+    @FXML
+    private Label lbl_weight;
+
+    @FXML
+    private Label lbl_weightedScore;
+
+    @FXML
+    private TextField txt_score;
+
+    @FXML
+    void commitChange(ActionEvent event) {
+        if (!DateValidator.check(dp_date.getValue())) {
+            ManageConsole.printS("date validation failed");
+            return;
+        }
+        if (!DoubleValidator.checkScore(txt_score.getText(), selectedAssignment.getTotal())) {
+            ManageConsole.printS("score validation failed");
+            return;
+        }
+
+        SubmitAssignment.entry(dp_date.getValue(), txt_score.getText(), selectedAssignment);
+        updateLabels();
+    }
+
+    @FXML
+    void goBack(ActionEvent event) {
+        StageManagement.closeScreen(event);
+    }
+
+    private void updateLabels() {
+        lbl_name.setText(selectedAssignment.getName());
+        lbl_total.setText(VariableConversions.doubleToString(selectedAssignment.getTotal()));
+        lbl_date.setText(VariableConversions.localDateToString(selectedAssignment.getDateDue()) + ", 2023");
+        if (selectedAssignment.getDateSubmit().isAfter(LocalDate.of(2023, 9, 1))) {
+            dp_date.setValue(selectedAssignment.getDateSubmit());
+        }
+        if (selectedAssignment.getDaysLate() == -1) {
+            lbl_late.setText("-");
+        } else {
+            lbl_late.setText(VariableConversions.intToString(selectedAssignment.getDaysLate()));
+        }
+        lbl_weight.setText(VariableConversions.doubleToString(selectedAssignment.getWeight() * 100) + "%");
+
+        ManageConsole.printS(selectedAssignment.getScoreWeighted());
+        if (selectedAssignment.getScoreWeighted() == -1) {
+            lbl_weightedScore.setText("-");
+        } else {
+            lbl_weightedScore
+                    .setText(VariableConversions.doubleToString(selectedAssignment.getScoreWeighted() * 100) + "%");
+        }
+
+        ManageConsole.printS(selectedAssignment.getFinalMark());
+        if (selectedAssignment.getFinalMark() == -1) {
+            lbl_final.setText("-");
+        } else {
+            lbl_final.setText(VariableConversions.doubleToString(selectedAssignment.getFinalMark() * 100) + "%");
+        }
+    }
+
+}
+
+package vanduzee.controllers.studentControllers;
+
+import java.time.LocalDate;
+
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.scene.control.DatePicker;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import vanduzee.models.objectManagement.studentSubmission.SubmitTest;
+import vanduzee.models.utility.ManageConsole;
+import vanduzee.models.utility.StageManagement;
+import vanduzee.models.utility.VariableConversions;
+import vanduzee.models.validation.DateValidator;
+import vanduzee.models.validation.DoubleValidator;
+import vanduzee.objects.Student;
+import vanduzee.objects.Test;
+
+public class StudentTestController {
+    Student selectedStudent;
+    Test selectedTest;
+
+    public void setTest(Test test, Student student) {
+        selectedTest = test;
+        selectedStudent = student;
+        updateLabels();
+    }
+
+    @FXML
+    private DatePicker dp_date;
+
+    @FXML
+    private Label lbl_date;
+
+    @FXML
+    private Label lbl_final;
+
+    @FXML
+    private Label lbl_late;
+
+    @FXML
+    private Label lbl_name;
+
+    @FXML
+    private Label lbl_total;
+
+    @FXML
+    private Label lbl_weight;
+
+    @FXML
+    private Label lbl_weightedScore;
+
+    @FXML
+    private TextField txt_score;
+
+    @FXML
+    void commitChange(ActionEvent event) {
+        if (!DateValidator.check(dp_date.getValue())) {
+            ManageConsole.printS("date validation failed");
+            return;
+        }
+        if (!DoubleValidator.checkScore(txt_score.getText(), selectedTest.getTotal())) {
+            ManageConsole.printS("score validation failed");
+            return;
+        }
+
+        SubmitTest.entry(dp_date.getValue(), txt_score.getText(), selectedTest);
+        updateLabels();
+    }
+
+    @FXML
+    void goBack(ActionEvent event) {
+        StageManagement.closeScreen(event);
+    }
+
+    private void updateLabels() {
+        lbl_name.setText(selectedTest.getName());
+        lbl_total.setText(VariableConversions.doubleToString(selectedTest.getTotal()));
+        lbl_date.setText(VariableConversions.localDateToString(selectedTest.getDateDue()) + ", 2023");
+        if (selectedTest.getDateSubmit().isAfter(LocalDate.of(2023, 9, 1))) {
+            dp_date.setValue(selectedTest.getDateSubmit());
+        }
+        if (selectedTest.getDaysLate() == -1) {
+            lbl_late.setText("-");
+        } else {
+            lbl_late.setText(VariableConversions.intToString(selectedTest.getDaysLate()));
+        }
+        lbl_weight.setText(VariableConversions.doubleToString(selectedTest.getWeight() * 100) + "%");
+
+        ManageConsole.printS(selectedTest.getScoreWeighted());
+        if (selectedTest.getScoreWeighted() == -1) {
+            lbl_weightedScore.setText("-");
+        } else {
+            lbl_weightedScore
+                    .setText(VariableConversions.doubleToString(selectedTest.getScoreWeighted() * 100) + "%");
+        }
+
+        ManageConsole.printS(selectedTest.getFinalMark());
+        if (selectedTest.getFinalMark() == -1) {
+            lbl_final.setText("-");
+        } else {
+            lbl_final.setText(VariableConversions.doubleToString(selectedTest.getFinalMark() * 100) + "%");
+        }
+    }
+
+}
+
+package vanduzee.controllers.studentControllers;
+
+/* #region imports */
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.Label;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import javafx.stage.StageStyle;
+import vanduzee.models.objectManagement.objectUtils.Remove;
+import vanduzee.models.tableFormatting.TableUtils;
+import vanduzee.models.utility.ManageConsole;
+import vanduzee.models.utility.StageManagement;
+import vanduzee.models.utility.VariableConversions;
+import vanduzee.models.validation.DisplayMessage;
+/* #endregion */
+import vanduzee.objects.Assignment;
+import vanduzee.objects.Student;
+import vanduzee.objects.Test;
+
+public class ViewStudentController {
+    Student selectedStudent;
+
+    public void setStudent(Student student) {
+        selectedStudent = student;
+        updateAll();
+    }
+
+    /* #region fxml variables */
+    /* #region assignment table */
+    @FXML
+    private TableColumn<Assignment, String> assignment_dateDue;
+
+    @FXML
+    private TableColumn<Assignment, String> assignment_dateSubmit;
+
+    @FXML
+    private TableColumn<Assignment, String> assignment_name;
+
+    @FXML
+    private TableColumn<Assignment, String> assignment_percent;
+
+    @FXML
+    private TableColumn<Assignment, String> assignment_score;
+
+    @FXML
+    private TableView<Assignment> assignment_table;
+
+    @FXML
+    private TableColumn<Assignment, String> assignment_total;
+    /* #endregion */
+
+    @FXML
+    private Label lbl_grade;
+
+    @FXML
+    private Label lbl_id;
+
+    @FXML
+    private Label lbl_name;
+
+    /* #region test table */
+    @FXML
+    private TableColumn<Test, String> test_dateDue;
+
+    @FXML
+    private TableColumn<Test, String> test_dateSubmit;
+
+    @FXML
+    private TableColumn<Test, String> test_name;
+
+    @FXML
+    private TableColumn<Test, String> test_percent;
+
+    @FXML
+    private TableColumn<Test, String> test_score;
+
+    @FXML
+    private TableView<Test> test_table;
+
+    @FXML
+    private TableColumn<Test, String> test_total;
+    /* #endregion */
+    /* #endregion */
+
+    /* #region buttons */
+    @FXML
+    void editAssignment(ActionEvent event) {
+        Assignment assignment = assignment_table.getSelectionModel().getSelectedItem();
+        try {
+            if (assignment != null) {
+                Stage viewAssignmentStage = new Stage();
+                viewAssignmentStage.initModality(Modality.APPLICATION_MODAL);
+                viewAssignmentStage.initStyle(StageStyle.DECORATED);
+
+                FXMLLoader assignmentViewLoader = new FXMLLoader(
+                        getClass().getResource("/student/studentAssignment.fxml"));
+                Parent assignmentViewRoot = assignmentViewLoader.load();
+                StudentAssignmentController assignmentViewController = assignmentViewLoader.getController();
+                assignmentViewController.setAssignment(assignment, selectedStudent);
+
+                Scene newScene = new Scene(assignmentViewRoot);
+                viewAssignmentStage.setScene(newScene);
+                ManageConsole.clearConsole();
+                viewAssignmentStage.showAndWait();
+
+                updateAssignmentTable();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @FXML
+    void editTest(ActionEvent event) {
+        Test test = test_table.getSelectionModel().getSelectedItem();
+        try {
+            if (test != null) {
+                Stage viewTestStage = new Stage();
+                viewTestStage.initModality(Modality.APPLICATION_MODAL);
+                viewTestStage.initStyle(StageStyle.DECORATED);
+
+                FXMLLoader testViewLoader = new FXMLLoader(
+                        getClass().getResource("/student/studentTest.fxml"));
+                Parent testViewRoot = testViewLoader.load();
+                StudentTestController testViewController = testViewLoader.getController();
+                testViewController.setTest(test, selectedStudent);
+
+                Scene newScene = new Scene(testViewRoot);
+                viewTestStage.setScene(newScene);
+                ManageConsole.clearConsole();
+                viewTestStage.showAndWait();
+
+                updateTestTable();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @FXML
+    void exitWindow(ActionEvent event) {
+        StageManagement.closeScreen(event);
+    }
+
+    @FXML
+    void removeStudent(ActionEvent event) {
+        String header = "Warning: Removing Student";
+        String content = "This will permanently remove this student. Are you certain you wish to proceed?";
+        if (DisplayMessage.confirm(header, content)) {
+            Remove.rmStudent(selectedStudent);
+            StageManagement.closeScreen(event);
+        }
+    }
+    /* #endregion */
+
+    /* #region updaters */
+    private void updateAll() {
+        updateAssignmentTable();
+        updateLabels();
+        updateTestTable();
+    }
+
+    private void updateTestTable() {
+        ObservableList<Test> testList = FXCollections.observableArrayList(selectedStudent.getTests());
+        test_table.setItems(testList);
+
+        test_name.setCellValueFactory(new PropertyValueFactory<>("tableName"));
+        test_dateSubmit.setCellValueFactory(new PropertyValueFactory<>("tableDateSubmit"));
+        test_dateDue.setCellValueFactory(new PropertyValueFactory<>("tableDateDue"));
+        test_score.setCellValueFactory(new PropertyValueFactory<>("tableScore"));
+        test_total.setCellValueFactory(new PropertyValueFactory<>("tableTotal"));
+        test_percent.setCellValueFactory(new PropertyValueFactory<>("tablePercent"));
+
+        TableUtils.centerColumnValues(test_dateSubmit);
+        TableUtils.centerColumnValues(test_dateDue);
+        TableUtils.centerColumnValues(test_score);
+        TableUtils.centerColumnValues(test_total);
+        TableUtils.centerColumnValues(test_percent);
+
+        test_table.refresh();
+    }
+
+    private void updateAssignmentTable() {
+        ObservableList<Assignment> assignmentList = FXCollections.observableArrayList(selectedStudent.getAssignments());
+        assignment_table.setItems(assignmentList);
+
+        assignment_name.setCellValueFactory(new PropertyValueFactory<>("tableName"));
+        assignment_dateSubmit.setCellValueFactory(new PropertyValueFactory<>("tableDateSubmit"));
+        assignment_dateDue.setCellValueFactory(new PropertyValueFactory<>("tableDateDue"));
+        assignment_score.setCellValueFactory(new PropertyValueFactory<>("tableScore"));
+        assignment_total.setCellValueFactory(new PropertyValueFactory<>("tableTotal"));
+        assignment_percent.setCellValueFactory(new PropertyValueFactory<>("tablePercent"));
+
+        TableUtils.centerColumnValues(assignment_dateSubmit);
+        TableUtils.centerColumnValues(assignment_dateDue);
+        TableUtils.centerColumnValues(assignment_score);
+        TableUtils.centerColumnValues(assignment_total);
+        TableUtils.centerColumnValues(assignment_percent);
+
+        assignment_table.refresh();
+    }
+
+    private void updateLabels() {
+        lbl_name.setText("Student Name: " + selectedStudent.getName());
+        lbl_id.setText("Student ID: " + VariableConversions.intToString(selectedStudent.getId()));
+        String gradeText = "";
+        if (selectedStudent.getTotalGrade() == -1) {
+            gradeText = "N/A";
+        } else {
+            gradeText = VariableConversions.doubleToString(selectedStudent.getTotalGrade());
+        }
+        lbl_grade.setText("Total Grade: " + gradeText);
+    }
+    /* #endregion */
+
+}
+
+package vanduzee.controllers.testControllers;
+
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.scene.control.DatePicker;
+import javafx.scene.control.TextField;
+import vanduzee.models.objectManagement.createObject.CreateTest;
+import vanduzee.models.utility.ManageConsole;
+import vanduzee.models.utility.StageManagement;
+import vanduzee.models.validation.DateValidator;
+import vanduzee.models.validation.DoubleValidator;
+import vanduzee.models.validation.StringValidator;
+
+public class AddTestController {
+
+    @FXML
+    private DatePicker dp_date;
+
+    @FXML
+    private TextField txt_marks;
+
+    @FXML
+    private TextField txt_name;
+
+    @FXML
+    private TextField txt_weight;
+
+    @FXML
+    void cancelAdd(ActionEvent event) {
+        StageManagement.closeScreen(event);
+    }
+
+    @FXML
+    void confirmAdd(ActionEvent event) {
+
+        if (!StringValidator.checkTestName(txt_name.getText())) {
+            ManageConsole.printS("name validation failed");
+            return;
+        }
+
+        if (!DoubleValidator.checkTotal(txt_marks.getText())) {
+            ManageConsole.printS("marks validation failed");
+            return;
+        }
+
+        if (!DateValidator.check(dp_date.getValue())) {
+            ManageConsole.printS("date validation failed");
+            return;
+        }
+
+        if (!DoubleValidator.checkWeight(txt_weight.getText())) {
+            ManageConsole.printS("weight validation failed");
+            return;
+        }
+
+        CreateTest.newTest(txt_name.getText(), txt_marks.getText(), dp_date.getValue(),
+                txt_weight.getText());
+        StageManagement.closeScreen(event);
+    }
+
+}
+
+package vanduzee.controllers.testControllers;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.scene.control.DatePicker;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import vanduzee.models.objectManagement.modifyObject.ModifyTest;
+import vanduzee.models.objectManagement.objectUtils.Remove;
+import vanduzee.models.utility.ManageConsole;
+import vanduzee.models.utility.StageManagement;
+import vanduzee.models.utility.VariableConversions;
+import vanduzee.models.validation.DateValidator;
+import vanduzee.models.validation.DisplayMessage;
+import vanduzee.models.validation.DoubleValidator;
+import vanduzee.models.validation.StringValidator;
+import vanduzee.objects.MasterList;
+import vanduzee.objects.Student;
+import vanduzee.objects.Test;
+
+public class ViewTestController {
+    Test selectedTest;
+
+    public void setTest(Test test) {
+        selectedTest = test;
+        updateAll();
+    }
+
+    @FXML
+    private DatePicker dp_date;
+
+    @FXML
+    private Label lbl_submission;
+
+    @FXML
+    private TextField txt_marks;
+
+    @FXML
+    private TextField txt_name;
+
+    @FXML
+    private TextField txt_weight;
+
+    @FXML
+    void confirmChanges(ActionEvent event) {
+        String newName;
+        String displayName;
+        double newTotal;
+        String displayTotal;
+        LocalDate newDate;
+        String displayDate;
+        double newWeight;
+        String displayWeight;
+
+        if (!StringValidator.checkTestName(txt_name.getText(), selectedTest)) {
+            ManageConsole.printS("name validation failed");
+            return;
+        } else {
+            newName = txt_name.getText();
+            displayName = ModifyTest.stringName(txt_name.getText());
+        }
+
+        if (!DoubleValidator.checkTotal(txt_marks.getText())) {
+            ManageConsole.printS("marks validation failed");
+            return;
+        } else {
+            newTotal = ModifyTest.doubleTotal(txt_marks.getText());
+            displayTotal = ModifyTest.stringTotal(txt_marks.getText());
+        }
+
+        if (!DateValidator.check(dp_date.getValue())) {
+            ManageConsole.printS("date validation failed");
+            return;
+        } else {
+            newDate = ModifyTest.localDateDue(dp_date.getValue());
+            displayDate = ModifyTest.stringDate(dp_date.getValue());
+        }
+
+        if (!DoubleValidator.checkWeight(txt_weight.getText())) {
+            ManageConsole.printS("weight validation failed");
+            return;
+        } else {
+            newWeight = ModifyTest.doubleWeight(txt_weight.getText());
+            displayWeight = ModifyTest.stringWeight(txt_weight.getText());
+        }
+
+        String header = "Warning: Updating Test";
+        String content = "This will update " + selectedTest.getName() + " to reflect the following:\n";
+        content += displayName + displayTotal + displayDate + displayWeight;
+
+        if (DisplayMessage.confirm(header, content)) {
+            ModifyTest.updateMasterTest(selectedTest, newName, newTotal, newDate, newWeight);
+            updateAll();
+        }
+
+    }
+
+    @FXML
+    void goBack(ActionEvent event) {
+        StageManagement.closeScreen(event);
+    }
+
+    @FXML
+    void removeTest(ActionEvent event) {
+
+        String header = "Warning: Removing Test";
+        String content = "This will permanently remove " + selectedTest.getName()
+                + " from all students. Are you certain you wish to proceed?";
+        if (DisplayMessage.confirm(header, content)) {
+            Remove.rmTest(selectedTest);
+            StageManagement.closeScreen(event);
+        }
+    }
+
+    private void updateAll() {
+        txt_name.setText(selectedTest.getName());
+        txt_marks.setText(VariableConversions.doubleToString(selectedTest.getTotal()));
+        dp_date.setValue(selectedTest.getDateDue());
+        txt_weight.setText(VariableConversions.doubleToString(selectedTest.getWeight() * 100));
+
+        MasterList master = MasterList.getInstance();
+        if (master.getMasterStudents() == null || master.getMasterStudents().isEmpty()) {
+            lbl_submission.setText("N / A");
+        } else {
+            String studentCount = VariableConversions.intToString(master.getMasterStudents().size());
+            String submitCount = cycleStudents(master);
+            lbl_submission.setText(submitCount + " / " + studentCount);
+        }
+    }
+
+    private String cycleStudents(MasterList master) {
+        int submitCounter = 0;
+        ArrayList<Student> students = master.getMasterStudents();
+        for (Student student : students) {
+            ArrayList<Test> tests = student.getTests();
+            for (Test test : tests) {
+                submitCounter += checkTest(test);
+            }
+        }
+        String returnSubmit = VariableConversions.intToString(submitCounter);
+        return returnSubmit;
+    }
+
+    private int checkTest(Test test) {
+        if (!test.getName().equals(selectedTest.getName())) {
+            return 0;
+        }
+        if (test.getScore() == -1) {
+            return 0;
+        }
+        return 1;
+    }
+
+}
+
+package vanduzee.controllers;
+
+import java.io.IOException;
+
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import javafx.stage.StageStyle;
+import vanduzee.App;
+import vanduzee.controllers.assignmentControllers.ViewAssignmentController;
+import vanduzee.models.tableFormatting.TableUtils;
+import vanduzee.models.utility.FileIO;
+import vanduzee.models.utility.ManageConsole;
+import vanduzee.objects.Assignment;
+import vanduzee.objects.MasterList;
+
+public class AssignmentDashboardController {
+    MasterList master;
+
+    @FXML
+    public void initialize() {
+        ManageConsole.clearConsole();
+        master = MasterList.getInstance();
+        refreshTable();
+    }
+
+    @FXML
+    private TableColumn<Assignment, String> assignment_date;
+
+    @FXML
+    private TableColumn<Assignment, String> assignment_name;
+
+    @FXML
+    private TableView<Assignment> assignment_table;
+
+    @FXML
+    private TableColumn<Assignment, String> assignment_total;
+
+    @FXML
+    private TableColumn<Assignment, String> assignment_weight;
+
+    @FXML
+    void assignment_add(ActionEvent event) throws IOException {
+        FXMLLoader assignmentAdd = new FXMLLoader(getClass().getResource("/assignment/addAssignment.fxml"));
+        Parent newRoot = assignmentAdd.load();
+        Stage addAssignmentStage = new Stage();
+        addAssignmentStage.initModality(Modality.APPLICATION_MODAL);
+        addAssignmentStage.initStyle(StageStyle.DECORATED);
+        Scene newScene = new Scene(newRoot);
+        addAssignmentStage.setScene(newScene);
+        ManageConsole.clearConsole();
+        addAssignmentStage.showAndWait();
+        refreshTable();
+    }
+
+    @FXML
+    void assignment_dashboard(ActionEvent event) {
+
+    }
+
+    @FXML
+    void assignment_view(ActionEvent event) throws IOException {
+        Assignment assignment = assignment_table.getSelectionModel().getSelectedItem();
+        try {
+            if (assignment != null) {
+                Stage viewAssignmentStage = new Stage();
+                viewAssignmentStage.initModality(Modality.APPLICATION_MODAL);
+                viewAssignmentStage.initStyle(StageStyle.DECORATED);
+
+                FXMLLoader assignmentViewLoader = new FXMLLoader(
+                        getClass().getResource("/assignment/viewAssignment.fxml"));
+                Parent assignmentViewRoot = assignmentViewLoader.load();
+                ViewAssignmentController assignmentViewController = assignmentViewLoader.getController();
+                assignmentViewController.setAssignment(assignment);
+
+                Scene newScene = new Scene(assignmentViewRoot);
+                viewAssignmentStage.setScene(newScene);
+                ManageConsole.clearConsole();
+                viewAssignmentStage.showAndWait();
+
+                refreshTable();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @FXML
+    void option_load(ActionEvent event) {
+        master = FileIO.loadSingletonFromFile();
+        MasterList.setInstance(master);
+        refreshTable();
+    }
+
+    @FXML
+    void option_save(ActionEvent event) {
+        FileIO.saveSingletonToFile();
+    }
+
+    @FXML
+    void student_dashboard(ActionEvent event) throws IOException {
+        App.setRoot("/Dashboard_Student");
+    }
+
+    @FXML
+    void test_dashboard(ActionEvent event) throws IOException {
+        App.setRoot("/Dashboard_Test");
+    }
+
+    private void refreshTable() {
+        master = MasterList.getInstance();
+        ObservableList<Assignment> assignmentList = FXCollections.observableArrayList(master.getMasterAssignments());
+        assignment_table.setItems(assignmentList);
+
+        assignment_name.setCellValueFactory(new PropertyValueFactory<>("tableName"));
+        assignment_total.setCellValueFactory(new PropertyValueFactory<>("tableTotal"));
+        assignment_weight.setCellValueFactory(new PropertyValueFactory<>("tableWeight"));
+        assignment_date.setCellValueFactory(new PropertyValueFactory<>("tableDateDue"));
+
+        TableUtils.centerColumnValues(assignment_total);
+        TableUtils.centerColumnValues(assignment_weight);
+        TableUtils.centerColumnValues(assignment_date);
+
+        assignment_table.refresh();
+    }
+
+}
+
+package vanduzee.controllers;
+
+import java.io.IOException;
+
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import javafx.stage.StageStyle;
+import vanduzee.App;
+import vanduzee.controllers.studentControllers.ViewStudentController;
+import vanduzee.models.tableFormatting.TableUtils;
+import vanduzee.models.utility.FileIO;
+import vanduzee.models.utility.ManageConsole;
+import vanduzee.objects.MasterList;
+import vanduzee.objects.Student;
+
+public class StudentDashboardController {
+    MasterList master;
+
+    @FXML
+    public void initialize() {
+        ManageConsole.clearConsole();
+        master = MasterList.getInstance();
+        refreshTable();
+    }
+
+    @FXML
+    private TableColumn<Student, String> student_assignments;
+
+    @FXML
+    private TableColumn<Student, String> student_id;
+
+    @FXML
+    private TableColumn<Student, String> student_name;
+
+    @FXML
+    private TableView<Student> student_table;
+
+    @FXML
+    private TableColumn<Student, String> student_testGrade;
+
+    @FXML
+    private TableColumn<Student, String> student_tests;
+
+    @FXML
+    private TableColumn<Student, String> student_totalGrade;
+
+    @FXML
+    void assignment_dashboard(ActionEvent event) throws IOException {
+        App.setRoot("/Dashboard_Assignment");
+    }
+
+    @FXML
+    void option_load(ActionEvent event) {
+        master = FileIO.loadSingletonFromFile();
+        MasterList.setInstance(master);
+        refreshTable();
+    }
+
+    @FXML
+    void option_save(ActionEvent event) {
+        FileIO.saveSingletonToFile();
+    }
+
+    @FXML
+    void student_add(ActionEvent event) throws IOException {
+        FXMLLoader studentAdd = new FXMLLoader(getClass().getResource("/student/addStudent.fxml"));
+        Parent newRoot = studentAdd.load();
+        Stage addStudentStage = new Stage();
+        addStudentStage.initModality(Modality.APPLICATION_MODAL);
+        addStudentStage.initStyle(StageStyle.DECORATED);
+        Scene newScene = new Scene(newRoot);
+        addStudentStage.setScene(newScene);
+        ManageConsole.clearConsole();
+        addStudentStage.showAndWait();
+
+        refreshTable();
+    }
+
+    @FXML
+    void student_dashboard(ActionEvent event) {
+
+    }
+
+    @FXML
+    void student_view(ActionEvent event) throws IOException {
+        Student student = student_table.getSelectionModel().getSelectedItem();
+        try {
+            if (student != null) {
+                Stage viewStudentStage = new Stage();
+                viewStudentStage.initModality(Modality.APPLICATION_MODAL);
+                viewStudentStage.initStyle(StageStyle.DECORATED);
+
+                FXMLLoader studentViewLoader = new FXMLLoader(
+                        getClass().getResource("/student/viewStudent.fxml"));
+                Parent studentViewRoot = studentViewLoader.load();
+                ViewStudentController studentViewController = studentViewLoader.getController();
+                studentViewController.setStudent(student);
+
+                Scene newScene = new Scene(studentViewRoot);
+                viewStudentStage.setScene(newScene);
+                ManageConsole.clearConsole();
+                viewStudentStage.showAndWait();
+
+                refreshTable();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @FXML
+    void test_dashboard(ActionEvent event) throws IOException {
+        App.setRoot("/Dashboard_Test");
+    }
+
+    private void refreshTable() {
+        master = MasterList.getInstance();
+        ObservableList<Student> studentList = FXCollections.observableArrayList(master.getMasterStudents());
+        student_table.setItems(studentList);
+
+        student_name.setCellValueFactory(new PropertyValueFactory<>("tableName"));
+        student_id.setCellValueFactory(new PropertyValueFactory<>("tableId"));
+        student_assignments.setCellValueFactory(new PropertyValueFactory<>("tableAssignments"));
+        student_tests.setCellValueFactory(new PropertyValueFactory<>("tableTests"));
+        student_testGrade.setCellValueFactory(new PropertyValueFactory<>("tableTestGrade"));
+        student_totalGrade.setCellValueFactory(new PropertyValueFactory<>("tableOverallGrade"));
+
+        TableUtils.centerColumnValues(student_id);
+        TableUtils.centerColumnValues(student_assignments);
+        TableUtils.centerColumnValues(student_tests);
+        TableUtils.centerColumnValues(student_testGrade);
+        TableUtils.centerColumnValues(student_totalGrade);
+
+        student_table.refresh();
+    }
+
+}
+
+package vanduzee.controllers;
+
+/* #region imports */
+import java.io.IOException;
+
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import javafx.stage.StageStyle;
+import vanduzee.App;
+import vanduzee.controllers.testControllers.ViewTestController;
+import vanduzee.models.tableFormatting.TableUtils;
+import vanduzee.models.utility.FileIO;
+import vanduzee.models.utility.ManageConsole;
+import vanduzee.objects.MasterList;
+import vanduzee.objects.Test;
+/* #endregion */
+
+public class TestDashboardController {
+    MasterList master;
+
+    @FXML
+    public void initialize() {
+        ManageConsole.clearConsole();
+        master = MasterList.getInstance();
+        refreshTable();
+    }
+
+    /* #region fxml variables */
+    /* #region test table */
+    @FXML
+    private TableColumn<Test, String> test_date;
+
+    @FXML
+    private TableColumn<Test, String> test_name;
+
+    @FXML
+    private TableView<Test> test_table;
+
+    @FXML
+    private TableColumn<Test, String> test_total;
+
+    @FXML
+    private TableColumn<Test, String> test_weight;
+    /* #endregion */
+    /* #endregion */
+
+    /* #region buttons */
+    @FXML
+    void assignment_dashboard(ActionEvent event) throws IOException {
+        App.setRoot("/Dashboard_Assignment");
+    }
+
+    @FXML
+    void option_load(ActionEvent event) {
+        master = FileIO.loadSingletonFromFile();
+        MasterList.setInstance(master);
+        refreshTable();
+    }
+
+    @FXML
+    void option_save(ActionEvent event) {
+        FileIO.saveSingletonToFile();
+    }
+
+    @FXML
+    void student_dashboard(ActionEvent event) throws IOException {
+        App.setRoot("/Dashboard_Student");
+    }
+
+    @FXML
+    void test_add(ActionEvent event) throws IOException {
+        FXMLLoader testAdd = new FXMLLoader(getClass().getResource("/test/addTest.fxml"));
+        Parent newRoot = testAdd.load();
+        Stage addTestStage = new Stage();
+        addTestStage.initModality(Modality.APPLICATION_MODAL);
+        addTestStage.initStyle(StageStyle.DECORATED);
+        Scene newScene = new Scene(newRoot);
+        addTestStage.setScene(newScene);
+        ManageConsole.clearConsole();
+        addTestStage.showAndWait();
+        refreshTable();
+    }
+
+    @FXML
+    void test_dashboard(ActionEvent event) {
+
+    }
+
+    @FXML
+    void test_view(ActionEvent event) throws IOException {
+        Test test = test_table.getSelectionModel().getSelectedItem();
+        try {
+            if (test != null) {
+                Stage viewTestStage = new Stage();
+                viewTestStage.initModality(Modality.APPLICATION_MODAL);
+                viewTestStage.initStyle(StageStyle.DECORATED);
+
+                FXMLLoader testViewLoader = new FXMLLoader(
+                        getClass().getResource("/test/viewTest.fxml"));
+                Parent testViewRoot = testViewLoader.load();
+                ViewTestController testViewController = testViewLoader.getController();
+                testViewController.setTest(test);
+
+                Scene newScene = new Scene(testViewRoot);
+                viewTestStage.setScene(newScene);
+                ManageConsole.clearConsole();
+                viewTestStage.showAndWait();
+
+                refreshTable();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+    /* #endregion */
+
+    /* #region refresher */
+    private void refreshTable() {
+        master = MasterList.getInstance();
+        ObservableList<Test> testList = FXCollections.observableArrayList(master.getMasterTests());
+        test_table.setItems(testList);
+
+        test_name.setCellValueFactory(new PropertyValueFactory<>("tableName"));
+        test_total.setCellValueFactory(new PropertyValueFactory<>("tableTotal"));
+        test_weight.setCellValueFactory(new PropertyValueFactory<>("tableWeight"));
+        test_date.setCellValueFactory(new PropertyValueFactory<>("tableDateDue"));
+
+        TableUtils.centerColumnValues(test_total);
+        TableUtils.centerColumnValues(test_weight);
+        TableUtils.centerColumnValues(test_date);
+
+        test_table.refresh();
+    }
+    /* #endregion */
+
+}
+
+package vanduzee.models.objectManagement.createObject;
+
+import java.time.LocalDate;
+
+import vanduzee.objects.Assignment;
+import vanduzee.objects.MasterList;
+import vanduzee.objects.Student;
+
+public class CreateAssignment {
+    public static void newAssignment(String newName, String newTotal, LocalDate newDate, String newWeight) {
+        String name = newName;
+        double total = Double.parseDouble(newTotal);
+        LocalDate date = newDate;
+        double weight = Double.parseDouble(newWeight) / 100;
+
+        MasterList master = MasterList.getInstance();
+        Assignment newAssignment = new Assignment(name, total, weight, date);
+        master.addMasterAssignment(newAssignment);
+
+        if (master.getMasterStudents() == null || master.getMasterStudents().isEmpty()) {
+            return;
+        }
+
+        for (Student student : master.getMasterStudents()) {
+            Assignment studentCopy = new Assignment(newAssignment);
+            student.addAssignment(studentCopy);
+        }
+    }
+}
+
+package vanduzee.models.objectManagement.createObject;
+
+import vanduzee.objects.Assignment;
+import vanduzee.objects.MasterList;
+import vanduzee.objects.Student;
+import vanduzee.objects.Test;
+
+public class CreateStudent {
+    public static void newStudent(String name, int id) {
+        MasterList master = MasterList.getInstance();
+        Student newStudent = new Student(name, id);
+        master.addMasterStudent(newStudent);
+
+        if (master.getMasterAssignments() != null && !master.getMasterAssignments().isEmpty()) {
+            for (Assignment assignment : master.getMasterAssignments()) {
+                Assignment newAssignment = new Assignment(assignment);
+                newStudent.addAssignment(newAssignment);
+            }
+        }
+
+        if (master.getMasterTests() != null && !master.getMasterTests().isEmpty()) {
+            for (Test test : master.getMasterTests()) {
+                Test newTest = new Test(test);
+                newStudent.addTest(newTest);
+            }
+        }
+    }
+}
+
+package vanduzee.models.objectManagement.createObject;
+
+import java.time.LocalDate;
+
+import vanduzee.objects.MasterList;
+import vanduzee.objects.Student;
+import vanduzee.objects.Test;
+
+public class CreateTest {
+    public static void newTest(String newName, String newTotal, LocalDate newDate, String newWeight) {
+        String name = newName;
+        double total = Double.parseDouble(newTotal);
+        LocalDate date = newDate;
+        double weight = Double.parseDouble(newWeight) / 100;
+
+        MasterList master = MasterList.getInstance();
+        Test newTest = new Test(name, total, weight, date);
+        master.addMasterTest(newTest);
+
+        if (master.getMasterStudents() == null || master.getMasterStudents().isEmpty()) {
+            return;
+        }
+
+        for (Student student : master.getMasterStudents()) {
+            Test studentCopy = new Test(newTest);
+            student.addTest(studentCopy);
+        }
+    }
+}
+
+package vanduzee.models.objectManagement.modifyObject;
+
+import java.time.LocalDate;
+
+import vanduzee.models.objectManagement.objectUtils.Update;
+import vanduzee.models.utility.VariableConversions;
+import vanduzee.objects.Assignment;
+import vanduzee.objects.MasterList;
+import vanduzee.objects.Student;
+
+public class ModifyAssignment {
+    public static String stringName(String newName) {
+        return "\nNew Assignment Name: " + newName;
+    }
+
+    public static String stringTotal(String newTotal) {
+        return "\nNew Total: " + newTotal;
+    }
+
+    public static double doubleTotal(String newTotal) {
+        return Double.parseDouble(newTotal);
+    }
+
+    public static String stringDate(LocalDate newDate) {
+        return "\nNew Date: " + VariableConversions.localDateToString(newDate) + ", 2023";
+    }
+
+    public static LocalDate localDateDue(LocalDate newDate) {
+        return newDate;
+    }
+
+    public static String stringWeight(String newWeight) {
+        return "\nNew Weight: " + newWeight + "%";
+    }
+
+    public static double doubleWeight(String newWeight) {
+        return Double.parseDouble(newWeight) / 100;
+    }
+
+    public static void updateMasterAssignment(Assignment assignment, String newName, double newTotal, LocalDate newDate,
+            double newWeight) {
+
+        String oldName = assignment.getName();
+        assignment.setName(newName);
+        assignment.setTotal(newTotal);
+        assignment.setDateDue(newDate);
+        assignment.setWeight(newWeight);
+
+        MasterList master = MasterList.getInstance();
+        if (master.getMasterStudents() != null || !master.getMasterStudents().isEmpty()) {
+            updateStudentCopies(assignment, oldName, master);
+        }
+    }
+
+    private static void updateStudentCopies(Assignment masterAssignment, String oldName, MasterList master) {
+
+        for (Student student : master.getMasterStudents()) {
+            for (Assignment studentCopy : student.getAssignments()) {
+                if (studentCopy.getName().equals(oldName)) {
+                    studentCopy.setName(masterAssignment.getName());
+                    studentCopy.setTotal(masterAssignment.getTotal());
+                    studentCopy.setDateDue(masterAssignment.getDateDue());
+                    studentCopy.setWeight(masterAssignment.getWeight());
+                    Update.uAssignment(studentCopy);
+                }
+            }
+        }
+    }
+}
+
+package vanduzee.models.objectManagement.modifyObject;
+
+import java.time.LocalDate;
+
+import vanduzee.models.objectManagement.objectUtils.Update;
+import vanduzee.models.utility.VariableConversions;
+import vanduzee.objects.MasterList;
+import vanduzee.objects.Student;
+import vanduzee.objects.Test;
+
+public class ModifyTest {
+    public static String stringName(String newName) {
+        return "\nNew Test Name: " + newName;
+    }
+
+    public static String stringTotal(String newTotal) {
+        return "\nNew Total: " + newTotal;
+    }
+
+    public static double doubleTotal(String newTotal) {
+        return Double.parseDouble(newTotal);
+    }
+
+    public static String stringDate(LocalDate newDate) {
+        return "\nNew Date: " + VariableConversions.localDateToString(newDate) + ", 2023";
+    }
+
+    public static LocalDate localDateDue(LocalDate newDate) {
+        return newDate;
+    }
+
+    public static String stringWeight(String newWeight) {
+        return "\nNew Weight: " + newWeight + "%";
+    }
+
+    public static double doubleWeight(String newWeight) {
+        return Double.parseDouble(newWeight) / 100;
+    }
+
+    public static void updateMasterTest(Test test, String newName, double newTotal, LocalDate newDate,
+            double newWeight) {
+
+        String oldName = test.getName();
+        test.setName(newName);
+        test.setTotal(newTotal);
+        test.setDateDue(newDate);
+        test.setWeight(newWeight);
+
+        MasterList master = MasterList.getInstance();
+        if (master.getMasterStudents() != null || !master.getMasterStudents().isEmpty()) {
+            updateStudentCopies(test, oldName, master);
+        }
+    }
+
+    private static void updateStudentCopies(Test masterTest, String oldName, MasterList master) {
+
+        for (Student student : master.getMasterStudents()) {
+            for (Test studentCopy : student.getTests()) {
+                if (studentCopy.getName().equals(oldName)) {
+                    studentCopy.setName(masterTest.getName());
+                    studentCopy.setTotal(masterTest.getTotal());
+                    studentCopy.setDateDue(masterTest.getDateDue());
+                    studentCopy.setWeight(masterTest.getWeight());
+                    Update.uTest(studentCopy);
+                }
+            }
+        }
+    }
+}
+
+package vanduzee.models.objectManagement.objectUtils;
+
+import vanduzee.objects.Assignment;
+import vanduzee.objects.MasterList;
+import vanduzee.objects.Student;
+import vanduzee.objects.Test;
+
+public class Remove {
+    public static void rmStudent(Student student) {
+        MasterList master = MasterList.getInstance();
+        master.removeMasterStudent(student);
+    }
+
+    public static void rmTest(Test test) {
+        String testName = test.getName();
+
+        MasterList master = MasterList.getInstance();
+        master.removeMasterTest(test);
+
+        if (master.getMasterStudents() != null || !master.getMasterStudents().isEmpty()) {
+            for (Student student : master.getMasterStudents()) {
+                for (Test studentCopy : student.getTests()) {
+                    if (studentCopy.getName().equals(testName)) {
+                        student.removeTest(studentCopy);
+                    }
+                }
+            }
+        }
+    }
+
+    public static void rmAssignment(Assignment assignment) {
+        String assignmentName = assignment.getName();
+
+        MasterList master = MasterList.getInstance();
+        master.removeMasterAssignment(assignment);
+
+        if (master.getMasterStudents() != null || !master.getMasterStudents().isEmpty()) {
+            for (Student student : master.getMasterStudents()) {
+                for (Assignment studentCopy : student.getAssignments()) {
+                    if (studentCopy.getName().equals(assignmentName)) {
+                        student.removeAssignment(studentCopy);
+                    }
+                }
+            }
+        }
+    }
+}
+
+package vanduzee.models.objectManagement.objectUtils;
+
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+
+import vanduzee.objects.Assignment;
+import vanduzee.objects.MasterList;
+import vanduzee.objects.Student;
+import vanduzee.objects.Test;
+
+public class Update {
+    public static void uAssignment(Assignment assignment) {
+        double total = assignment.getTotal();
+        double weight = assignment.getWeight();
+        LocalDate dateDue = assignment.getDateDue();
+
+        double score = assignment.getScore();
+        if (score == -1) {
+            return;
+        }
+
+        double scoreWeighted = score / total * weight;
+        assignment.setScoreWeighted(scoreWeighted);
+        LocalDate dateSubmit = assignment.getDateSubmit();
+
+        int daysLate = calculateDateDifference(dateDue, dateSubmit);
+        assignment.setDaysLate(daysLate);
+
+        double finalMark = scoreWeighted;
+        switch (daysLate) {
+            case 4:
+                finalMark *= 0.0;
+                break;
+            case 3:
+                finalMark *= 0.7;
+                break;
+            case 2:
+                finalMark *= 0.8;
+                break;
+            case 1:
+                finalMark *= 0.9;
+                break;
+            default:
+                finalMark *= 1.0;
+                break;
+        }
+        assignment.setFinalMark(finalMark);
+        uStudent();
+    }
+
+    public static void uTest(Test test) {
+        double total = test.getTotal();
+        double weight = test.getWeight();
+        LocalDate dateDue = test.getDateDue();
+
+        double score = test.getScore();
+        if (score == -1) {
+            return;
+        }
+
+        double scoreWeighted = score / total * weight;
+        test.setScoreWeighted(scoreWeighted);
+
+        LocalDate dateSubmit = test.getDateSubmit();
+        int daysLate = calculateDateDifference(dateDue, dateSubmit);
+        test.setDaysLate(daysLate);
+        double finalMark = scoreWeighted;
+        switch (daysLate) {
+            case 0:
+                finalMark *= 1;
+                break;
+            default:
+                finalMark *= 0;
+                break;
+        }
+        test.setFinalMark(finalMark);
+        uStudent();
+    }
+
+    private static int calculateDateDifference(LocalDate dateDue, LocalDate dateSubmit) {
+        if (dateDue.isAfter(dateSubmit) || dateDue.isEqual(dateSubmit)) {
+            return 0;
+        }
+
+        long daysDifference = ChronoUnit.DAYS.between(dateDue, dateSubmit);
+
+        if ((int) daysDifference >= 1 && (int) daysDifference <= 3) {
+            return (int) daysDifference;
+        }
+        return 4;
+    }
+
+    private static void uStudent() {
+        MasterList master = MasterList.getInstance();
+        if (master.getMasterStudents() == null || master.getMasterStudents().isEmpty()) {
+            return;
+        }
+
+        for (Student student : master.getMasterStudents()) {
+
+            double finalGrade = 0;
+            if (student.getAssignments() != null || !student.getAssignments().isEmpty()) {
+                for (Assignment assignment : student.getAssignments()) {
+                    finalGrade += assignment.getFinalMark();
+                }
+            }
+
+            double testWeights = 0;
+            double testGrade = 0;
+            if (student.getTests() != null || !student.getTests().isEmpty()) {
+                for (Test test : student.getTests()) {
+                    testWeights += test.getWeight();
+                    testGrade += test.getFinalMark();
+                    finalGrade += test.getFinalMark();
+                }
+            }
+            double testNetGrade = testGrade / testWeights * 100;
+
+            student.setTotalGrade(finalGrade);
+            student.setTotalTest(testNetGrade);
+
+        }
+
+    }
+}
+
+package vanduzee.models.objectManagement.studentSubmission;
+
+import java.time.LocalDate;
+
+import vanduzee.models.objectManagement.objectUtils.Update;
+import vanduzee.objects.Assignment;
+
+public class SubmitAssignment {
+    public static void entry(LocalDate newDate, String newScore, Assignment assignment) {
+        LocalDate submit = newDate;
+        double score = Double.parseDouble(newScore);
+
+        assignment.setDateSubmit(submit);
+        assignment.setScore(score);
+        Update.uAssignment(assignment);
+    }
+}
+
+package vanduzee.models.objectManagement.studentSubmission;
+
+import java.time.LocalDate;
+
+import vanduzee.models.objectManagement.objectUtils.Update;
+import vanduzee.objects.Test;
+
+public class SubmitTest {
+    public static void entry(LocalDate newDate, String newScore, Test test) {
+        LocalDate submit = newDate;
+        double score = Double.parseDouble(newScore);
+
+        test.setDateSubmit(submit);
+        test.setScore(score);
+        Update.uTest(test);
+    }
+}
+
+package vanduzee.models.tableFormatting;
+
+import java.time.LocalDate;
+
+import vanduzee.models.utility.VariableConversions;
+
+public class AssessmentTable {
+    public static String formatName(String name) {
+        return name;
+    }
+
+    public static String formatTotal(double total) {
+        return VariableConversions.doubleToString(total);
+    }
+
+    public static String formatWeight(double weight) {
+        double displayWeight = weight * 100;
+        return VariableConversions.doubleToString(displayWeight) + "%";
+    }
+
+    public static String formatDate(LocalDate date) {
+        LocalDate earliest = LocalDate.of(2023, 9, 5);
+        LocalDate latest = LocalDate.of(2023, 12, 22);
+
+        if (date.isBefore(earliest) || date.isAfter(latest)) {
+            return "-";
+        }
+
+        return VariableConversions.localDateToString(date);
+    }
+}
+
+package vanduzee.models.tableFormatting;
+
+import vanduzee.models.utility.VariableConversions;
+
+public class AssignmentTable extends AssessmentTable {
+    public static String formatScore(double score, int daysLate) {
+        if (score == -1) {
+            return "-";
+        }
+
+        String result = VariableConversions.doubleToString(score);
+        if (daysLate >= 1 && daysLate <= 3) {
+            result += " -" + Integer.toString(daysLate) + "0%";
+        } else if (daysLate >= 4) {
+            result += " -100%";
+        }
+
+        return result;
+    }
+
+    public static String formatPercent(double score, double total, int daysLate) {
+        if (score == -1) {
+            return "-";
+        }
+
+        double percent = score / total * 100.0;
+        if (daysLate >= 1 && daysLate <= 3) {
+            percent -= (percent * (0.1 * daysLate));
+        } else if (daysLate >= 4) {
+            percent = 0;
+        }
+
+        return VariableConversions.doubleToString(percent) + "%";
+    }
+}
+
+package vanduzee.models.tableFormatting;
+
+import java.util.ArrayList;
+
+import vanduzee.models.utility.VariableConversions;
+import vanduzee.objects.Assignment;
+import vanduzee.objects.Test;
+
+public class StudentTable {
+    public static String formatName(String name) {
+        return name;
+    }
+
+    public static String formatId(Integer id) {
+        return VariableConversions.intToString(id);
+    }
+
+    public static String formatAssignments(ArrayList<Assignment> assignments) {
+        if (assignments == null || assignments.isEmpty()) {
+            return "-";
+        }
+
+        int submitCount = 0;
+        for (Assignment assignment : assignments) {
+            if (assignment.getScore() != -1) {
+                submitCount++;
+            }
+        }
+
+        return VariableConversions.intToString(submitCount) + " / "
+                + VariableConversions.intToString(assignments.size());
+    }
+
+    public static String formatTests(ArrayList<Test> tests) {
+        if (tests == null || tests.isEmpty()) {
+            return "-";
+        }
+
+        int submitCount = 0;
+
+        for (Test test : tests) {
+            if (test.getScore() != -1) {
+                submitCount++;
+            }
+        }
+
+        return VariableConversions.intToString(submitCount) + " / " + VariableConversions.intToString(tests.size());
+    }
+
+    public static String formatTotalMark(double totalMark) {
+        if (totalMark == -1) {
+            return "-";
+        }
+        return VariableConversions.doubleToString(totalMark * 100) + "%";
+    }
+
+    public static String formatTotalTest(double totalTest) {
+        if (totalTest == -1) {
+            return "-";
+        }
+        return VariableConversions.doubleToString(totalTest) + "%";
+    }
+}
+
+package vanduzee.models.tableFormatting;
+
+import javafx.geometry.Pos;
+import javafx.scene.control.TableCell;
+import javafx.scene.control.TableColumn;
+import javafx.util.Callback;
+
+public class TableUtils {
+    public static <S, T> void centerColumnValues(TableColumn<S, T> column) {
+        column.setCellFactory(new Callback<TableColumn<S, T>, TableCell<S, T>>() {
+            @Override
+            public TableCell<S, T> call(TableColumn<S, T> param) {
+                TableCell<S, T> cell = new TableCell<S, T>() {
+                    @Override
+                    protected void updateItem(T item, boolean empty) {
+                        super.updateItem(item, empty);
+                        if (item == null || empty) {
+                            setText(null);
+                        } else {
+                            setText(item.toString());
+                            setAlignment(Pos.CENTER);
+                        }
+                    }
+                };
+                return cell;
+            }
+        });
+    }
+}
+
+package vanduzee.models.tableFormatting;
+
+import vanduzee.models.utility.VariableConversions;
+
+public class TestTable {
+    public static String formatScore(double score, int daysLate) {
+        if (score == -1) {
+            return "-";
+        }
+
+        String result = VariableConversions.doubleToString(score);
+        if (daysLate >= 1) {
+            result += " -100%";
+        }
+        return result;
+    }
+
+    public static String formatPercent(double score, double total, int daysLate) {
+        if (score == -1) {
+            return "-";
+        }
+
+        double percent = score / total * 100.0;
+        if (daysLate >= 1) {
+            percent = 0.0;
+        }
+
+        return VariableConversions.doubleToString(percent) + "%";
+    }
+}
+
+package vanduzee.models.utility;
+
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+
+import vanduzee.objects.MasterList;
+
+public class FileIO {
+    private static final String filename = "javafx/src/main/gradebook.txt";
+
+    public static MasterList loadSingletonFromFile() {
+        MasterList masterList = null;
+        ManageConsole.clearConsole();
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(filename))) {
+            masterList = (MasterList) ois.readObject();
+            System.out.println("MasterList loaded from " + filename);
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        return masterList;
+    }
+
+    public static void saveSingletonToFile() {
+        MasterList masterList = MasterList.getInstance();
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(filename))) {
+            oos.writeObject(masterList);
+            ManageConsole.clearConsole();
+            System.out.println("MasterList saved to " + filename);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+package vanduzee.models.utility;
+
+import java.time.LocalDate;
+
+public class ManageConsole {
+    public static void clearConsole() {
+        System.out.print("\033[H\033[2J");
+        System.out.flush();
+    }
+
+    public static void printS(String s) {
+        System.out.println(s);
+    }
+
+    public static void printS(int s) {
+        System.out.println(s);
+    }
+
+    public static void printS(boolean s) {
+        System.out.println(s);
+    }
+
+    public static void printS(double s) {
+        System.out.println(s);
+    }
+
+    public static void printS(LocalDate s) {
+        System.out.println(s);
+    }
+}
+
+package vanduzee.models.utility;
+
+import javafx.event.ActionEvent;
+import javafx.scene.*;
+import javafx.stage.Stage;
+
+public class StageManagement {
+    public static void closeScreen(ActionEvent event) {
+        Node source = (Node) event.getSource();
+        Stage stage = (Stage) source.getScene().getWindow();
+        stage.close();
+    }
+}
+
+package vanduzee.models.utility;
+
+import java.text.DecimalFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+
+public class VariableConversions {
+    public static String doubleToString(double source, int sigDigits) {
+        String format = "%." + sigDigits + "f";
+        return String.format(format, source);
+    }
+
+    public static String doubleToString(double source) {
+        DecimalFormat decimalFormat = new DecimalFormat("#.##");
+        return decimalFormat.format(source);
+    }
+
+    public static String localDateToString(LocalDate source) {
+        DateTimeFormatter pattern = DateTimeFormatter.ofPattern("MMM dd");
+        String formattedDate = pattern.format(source);
+        return formattedDate;
+    }
+
+    public static String booleanToString(boolean source) {
+        if (source == true) {
+            return "Valid";
+        } else {
+            return "Invalid";
+        }
+    }
+
+    public static String intToString(int source) {
+        return String.valueOf(source);
+    }
+}
+
+package vanduzee.models.validation;
+
+import java.time.LocalDate;
+
+import vanduzee.models.utility.VariableConversions;
+
+public class DateValidator {
+    public static boolean check(LocalDate date) {
+        LocalDate earliest = LocalDate.of(2023, 9, 5);
+        LocalDate latest = LocalDate.of(2023, 12, 22);
+
+        String stringEarly = VariableConversions.localDateToString(earliest);
+        String stringLate = VariableConversions.localDateToString(latest);
+
+        String header = "Date Out of Bounds";
+        String content = "Please enter a date between " + stringEarly + " and " + stringLate + " of 2023.";
+        if (date.isAfter(latest)) {
+            DisplayMessage.error(header, content);
+            return false;
+        }
+        if (date.isBefore(earliest)) {
+            DisplayMessage.error(header, content);
+            return false;
+        }
+        return true;
+    }
+}
+
+package vanduzee.models.validation;
+
+import java.util.Optional;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.ButtonType;
+
+public class DisplayMessage {
+    public static boolean confirm(String header, String content) {
+        boolean userChoice = false;
+        Alert confirmAlert = new Alert(AlertType.CONFIRMATION);
+        confirmAlert.setTitle("Confirmation");
+        confirmAlert.setHeaderText(header);
+        confirmAlert.setContentText(content);
+
+        Optional<ButtonType> result = confirmAlert.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            userChoice = true;
+        }
+
+        return userChoice;
+    }
+
+    public static void warning(String header, String content) {
+        Alert warningAlert = new Alert(AlertType.WARNING);
+        warningAlert.setTitle("Error");
+        warningAlert.setHeaderText(header);
+        warningAlert.setContentText(content);
+        warningAlert.showAndWait();
+    }
+
+    public static void error(String header, String content) {
+        Alert errorAlert = new Alert(AlertType.ERROR);
+        errorAlert.setTitle("Error");
+        errorAlert.setHeaderText(header);
+        errorAlert.setContentText(content);
+        errorAlert.showAndWait();
+    }
+}
+
+package vanduzee.models.validation;
+
+import vanduzee.models.utility.VariableConversions;
+
+public class DoubleValidator {
+    private static double maxScore = 100.0;
+    private static double minScore = 0.0;
+
+    private static boolean typeCheck(String number) {
+        try {
+            Double.parseDouble(number);
+        } catch (NumberFormatException e) {
+            String header = "Error: Number Format";
+            String content = "Please enter only numeric characters (digits after a decimal are allowed).";
+            DisplayMessage.error(header, content);
+            return false;
+        }
+        return true;
+    }
+
+    public static boolean checkWeight(String weight) {
+        if (!typeCheck(weight)) {
+            return false;
+        }
+        double doubleWeight = Double.parseDouble(weight);
+        if (doubleWeight > 100 || doubleWeight < 0) {
+            String header = "Error: Weight Out of Bounds";
+            String content = "Please enter a number between 0 and 100.";
+            DisplayMessage.error(header, content);
+        }
+        return true;
+    }
+
+    public static boolean checkTotal(String number) {
+        if (!typeCheck(number)) {
+            return false;
+        }
+        double mark = Double.parseDouble(number);
+        if (mark > maxScore || mark < minScore) {
+            String header = "Error: Total Out of Bounds";
+            String content = "Please enter a number between " + VariableConversions.doubleToString(minScore)
+                    + " and " + VariableConversions.doubleToString(maxScore) + ".";
+            DisplayMessage.error(header, content);
+            return false;
+        }
+        return true;
+    }
+
+    public static boolean checkScore(String number, double total) {
+        if (!typeCheck(number)) {
+            return false;
+        }
+        double score = Double.parseDouble(number);
+        total *= 1.05;
+        if (score > total) {
+            String header = "Error: Score Out of Bounds";
+            String content = "Please enter a number between " + VariableConversions.doubleToString(minScore)
+                    + " and " + VariableConversions.doubleToString(total) + ".";
+            DisplayMessage.error(header, content);
+            return false;
+        }
+        return true;
+    }
+}
+
+package vanduzee.models.validation;
+
+import vanduzee.objects.MasterList;
+import vanduzee.objects.Student;
+
+public class IntegerValidator {
+    private static boolean typeCheck(String number) {
+        try {
+            Integer.parseInt(number);
+        } catch (NumberFormatException e) {
+            String header = "Error: Number Format";
+            String content = "Please enter only numeric characters.";
+            DisplayMessage.error(header, content);
+            return false;
+        }
+        return true;
+    }
+
+    public static boolean checkId(String number) {
+        if (!typeCheck(number)) {
+            return false;
+        }
+
+        if (number.length() != 9) {
+            String header = "Error: ID Length";
+            String content = "Student IDs must be 9 digits long.";
+            DisplayMessage.error(header, content);
+            return false;
+        }
+
+        int studentId = Integer.parseInt(number);
+        MasterList master = MasterList.getInstance();
+
+        if (master.getMasterStudents() != null && !master.getMasterStudents().isEmpty()) {
+            for (Student student : master.getMasterStudents()) {
+                if (studentId == student.getId()) {
+                    String header = "Error: Duplicate ID";
+                    String content = "Student ID matches an existing student's ID. Please provide a unique ID.";
+                    DisplayMessage.error(header, content);
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+}
+
+package vanduzee.models.validation;
+
+import vanduzee.objects.Assignment;
+/* #endregion */
+/* #region imports */
+import vanduzee.objects.MasterList;
+import vanduzee.objects.Student;
+import vanduzee.objects.Test;
+
+public class StringValidator {
+    /* #region student */
+    public static boolean checkStudentName(String name) {
+        if (name == null || name.length() < 4) {
+            String header = "Error: Name Length";
+            String content = "Names must have 4 or more characters to be valid.";
+            DisplayMessage.error(header, content);
+            return false;
+        }
+
+        MasterList master = MasterList.getInstance();
+        if (master.getMasterStudents() == null || master.getMasterStudents().isEmpty()) {
+            return true;
+        }
+
+        for (Student student : master.getMasterStudents()) {
+            if (student.getName().equals(name)) {
+                String header = "Error: Duplicate Name";
+                String content = "Name entered matches that of another student. Please enter a unique name.";
+                DisplayMessage.error(header, content);
+                return false;
+            }
+        }
+        return true;
+    }
+    /* #endregion */
+
+    /* #region test */
+    public static boolean checkTestName(String name) {
+        if (name == null) {
+            String header = "Error: Missing Name";
+            String content = "Please provide a name for your test.";
+            DisplayMessage.error(header, content);
+            return false;
+        }
+
+        MasterList master = MasterList.getInstance();
+        if (master.getMasterTests() == null || master.getMasterTests().isEmpty()) {
+            return true;
+        }
+
+        for (Test test : master.getMasterTests()) {
+            if (name.equals(test.getName())) {
+                String header = "Error: Duplicate Name";
+                String content = "Test name matches an existing test's name. Please provide a unique name.";
+                DisplayMessage.error(header, content);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static boolean checkTestName(String name, Test oldTest) {
+        if (name == null) {
+            String header = "Error: Missing Name";
+            String content = "Please provide a name for your test.";
+            DisplayMessage.error(header, content);
+            return false;
+        }
+
+        MasterList master = MasterList.getInstance();
+        if (master.getMasterTests() == null || master.getMasterTests().isEmpty()) {
+            return true;
+        }
+
+        for (Test test : master.getMasterTests()) {
+            if (name.equals(test.getName()) && test != oldTest) {
+                String header = "Error: Duplicate Name";
+                String content = "Test name matches an existing test's name. Please provide a unique name.";
+                DisplayMessage.error(header, content);
+                return false;
+            }
+        }
+        return true;
+    }
+    /* #endregion */
+
+    /* #region assignment */
+    public static boolean checkAssignmentName(String name) {
+        if (name == null) {
+            String header = "Error: Missing Name";
+            String content = "Please provide a name for your assignment.";
+            DisplayMessage.error(header, content);
+            return false;
+        }
+
+        MasterList master = MasterList.getInstance();
+        if (master.getMasterAssignments() == null || master.getMasterAssignments().isEmpty()) {
+            return true;
+        }
+
+        for (Assignment assignment : master.getMasterAssignments()) {
+            if (name.equals(assignment.getName())) {
+                String header = "Error: Duplicate Name";
+                String content = "Assignment name matches an existing assignment's name. Please provide a unique name.";
+                DisplayMessage.error(header, content);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static boolean checkAssignmentName(String name, Assignment oldAssignment) {
+        if (name == null) {
+            String header = "Error: Missing Name";
+            String content = "Please provide a name for your assignment.";
+            DisplayMessage.error(header, content);
+            return false;
+        }
+
+        MasterList master = MasterList.getInstance();
+        if (master.getMasterAssignments() == null || master.getMasterAssignments().isEmpty()) {
+            return true;
+        }
+
+        for (Assignment assignment : master.getMasterAssignments()) {
+            if (name.equals(assignment.getName()) && assignment != oldAssignment) {
+                String header = "Error: Duplicate Name";
+                String content = "Assignment name matches an existing assignment's name. Please provide a unique name.";
+                DisplayMessage.error(header, content);
+                return false;
+            }
+        }
+        return true;
+    }
+    /* #endregion */
+}
+
+package vanduzee.objects;
+
+import java.io.Serializable;
+import java.time.LocalDate;
+
+import vanduzee.models.tableFormatting.AssessmentTable;
+
+public class Assessment implements Serializable {
+    // general variables
+    String name;
+    boolean masterCopy;
+
+    // master variables
+    double total;
+    double weight;
+    LocalDate dateDue;
+
+    // student variables
+    double score;
+    double scoreWeighted;
+    LocalDate dateSubmit;
+    int daysLate;
+    double finalMark;
+
+    // #region constructors
+    public Assessment(String newName, double newTotal, double newWeight, LocalDate newDateDue) {
+        masterCopy = true;
+        name = newName;
+        total = newTotal;
+        weight = newWeight;
+        dateDue = newDateDue;
+    }
+
+    public Assessment(Assessment masterAssessment) {
+        masterCopy = false;
+        name = masterAssessment.getName();
+        total = masterAssessment.getTotal();
+        weight = masterAssessment.getWeight();
+        dateDue = masterAssessment.getDateDue();
+
+        score = -1;
+        scoreWeighted = -1;
+        dateSubmit = LocalDate.of(0, 1, 1);
+        finalMark = 0;
+    }
+    // #endregion constructors
+
+    // #region Get/Setters:
+    public String getName() {
+        return this.name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public boolean isMasterCopy() {
+        return this.masterCopy;
+    }
+
+    public boolean getMasterCopy() {
+        return this.masterCopy;
+    }
+
+    public void setMasterCopy(boolean masterCopy) {
+        this.masterCopy = masterCopy;
+    }
+
+    public double getTotal() {
+        return this.total;
+    }
+
+    public void setTotal(double total) {
+        this.total = total;
+    }
+
+    public double getWeight() {
+        return this.weight;
+    }
+
+    public void setWeight(double weight) {
+        this.weight = weight;
+    }
+
+    public LocalDate getDateDue() {
+        return this.dateDue;
+    }
+
+    public void setDateDue(LocalDate dateDue) {
+        this.dateDue = dateDue;
+    }
+
+    public double getScore() {
+        return this.score;
+    }
+
+    public void setScore(double score) {
+        this.score = score;
+    }
+
+    public double getScoreWeighted() {
+        return this.scoreWeighted;
+    }
+
+    public void setScoreWeighted(double scoreWeighted) {
+        this.scoreWeighted = scoreWeighted;
+    }
+
+    public LocalDate getDateSubmit() {
+        return this.dateSubmit;
+    }
+
+    public void setDateSubmit(LocalDate dateSubmit) {
+        this.dateSubmit = dateSubmit;
+    }
+
+    public int getDaysLate() {
+        return daysLate;
+    }
+
+    public void setDaysLate(int daysLate) {
+        this.daysLate = daysLate;
+    }
+
+    public double getFinalMark() {
+        return this.finalMark;
+    }
+
+    public void setFinalMark(double finalMark) {
+        this.finalMark = finalMark;
+    }
+    // #endregion get/set
+
+    // #region table view (master)
+    private String tableName;
+    private String tableTotal;
+    private String tableWeight;
+    private String tableDateDue;
+
+    public String getTableName() {
+        tableName = AssessmentTable.formatName(name);
+        return tableName;
+    }
+
+    public String getTableTotal() {
+        tableTotal = AssessmentTable.formatTotal(total);
+        return tableTotal;
+    }
+
+    public String getTableWeight() {
+        tableWeight = AssessmentTable.formatWeight(weight);
+        return tableWeight;
+    }
+
+    public String getTableDateDue() {
+        tableDateDue = AssessmentTable.formatDate(dateDue);
+        return tableDateDue;
+    }
+    // #endregion master
+
+    // #region table view (student)
+    private String tableScore;
+    private String tablePercent;
+    private String tableDateSubmit;
+
+    public String getTableScore() { // overridden
+        return tableScore;
+    }
+
+    public String getTablePercent() { // overridden
+        return tablePercent;
+    }
+
+    public String getTableDateSubmit() {
+        tableDateSubmit = AssessmentTable.formatDate(dateSubmit);
+        return tableDateSubmit;
+    }
+    // #endregion student
+}
+
+package vanduzee.objects;
+
+import java.time.LocalDate;
+
+import vanduzee.models.tableFormatting.AssignmentTable;
+
+public class Assignment extends Assessment {
+    public Assignment(String newName, double newTotal, double newWeight, LocalDate newDateDue) {
+        super(newName, newTotal, newWeight, newDateDue);
+    }
+
+    public Assignment(Assessment masterAssignment) {
+        super(masterAssignment);
+    }
+
+    @Override
+    public String getTableScore() {
+        return AssignmentTable.formatScore(getScore(), getDaysLate());
+    }
+
+    @Override
+    public String getTablePercent() {
+        return AssignmentTable.formatPercent(getScore(), getTotal(), getDaysLate());
+    }
+}
+
+package vanduzee.objects;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+
+public class MasterList implements Serializable {
+    private ArrayList<Test> masterTests;
+    private ArrayList<Student> masterStudents;
+    private ArrayList<Assignment> masterAssignments;
+    private static MasterList instance;
+
+    public MasterList() {
+        masterTests = new ArrayList<>();
+        masterStudents = new ArrayList<>();
+        masterAssignments = new ArrayList<>();
+    }
+
+    public static MasterList getInstance() {
+        if (instance == null) {
+            instance = new MasterList();
+        }
+        return instance;
+    }
+
+    public static void setInstance(MasterList newInstance) {
+        instance = newInstance;
+    }
+
+    public ArrayList<Test> getMasterTests() {
+        return masterTests;
+    }
+
+    public void addMasterTest(Test newTest) {
+        masterTests.add(newTest);
+    }
+
+    public void removeMasterTest(Test oldTest) {
+        masterTests.remove(oldTest);
+    }
+
+    public void clearTests() {
+        masterTests.clear();
+    }
+
+    public ArrayList<Student> getMasterStudents() {
+        return masterStudents;
+    }
+
+    public void addMasterStudent(Student newStudent) {
+        masterStudents.add(newStudent);
+    }
+
+    public void removeMasterStudent(Student oldStudent) {
+        masterStudents.remove(oldStudent);
+    }
+
+    public void clearStudents() {
+        masterStudents.clear();
+    }
+
+    public ArrayList<Assignment> getMasterAssignments() {
+        return masterAssignments;
+    }
+
+    public void addMasterAssignment(Assignment newAssignment) {
+        masterAssignments.add(newAssignment);
+    }
+
+    public void removeMasterAssignment(Assignment oldAssignment) {
+        masterAssignments.remove(oldAssignment);
+    }
+
+    public void clearAssignments() {
+        masterAssignments.clear();
+    }
+}
+
+package vanduzee.objects;
+
+/* #region imports */
+import java.io.Serializable;
+import java.util.ArrayList;
+
+import vanduzee.models.tableFormatting.StudentTable;
+/* #endregion */
+
+public class Student implements Serializable {
+    /* #region object variables */
+    private String name;
+    private int id;
+
+    private ArrayList<Assignment> assignments;
+    private int submitAssignmants;
+    private ArrayList<Test> tests;
+    private int submitTests;
+
+    private double totalGrade;
+    private double totalTest;
+    /* #endregion */
+
+    /* #region constructor */
+    public Student(String name, int id) {
+        this.name = name;
+        this.id = id;
+        this.submitTests = -1;
+        this.submitAssignmants = -1;
+
+        this.tests = new ArrayList<Test>();
+        this.assignments = new ArrayList<Assignment>();
+
+        this.totalGrade = -1;
+        this.totalTest = -1;
+    }
+    /* #endregion */
+
+    /* #region Get / Set */
+    public String getName() {
+        return this.name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getId() {
+        return this.id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public ArrayList<Assignment> getAssignments() {
+        return this.assignments;
+    }
+
+    public void addAssignment(Assignment newAssignment) {
+        this.assignments.add(newAssignment);
+    }
+
+    public void removeAssignment(Assignment oldAssignment) {
+        this.assignments.remove(oldAssignment);
+    }
+
+    public void clearAssignments() {
+        this.assignments.clear();
+    }
+
+    public int getSubmitAssignmants() {
+        return this.submitAssignmants;
+    }
+
+    public void setSubmitAssignmants(int submitAssignmants) {
+        this.submitAssignmants = submitAssignmants;
+    }
+
+    public ArrayList<Test> getTests() {
+        return this.tests;
+    }
+
+    public void addTest(Test newTest) {
+        this.tests.add(newTest);
+    }
+
+    public void removeTest(Test oldTest) {
+        this.tests.remove(oldTest);
+    }
+
+    public void clearTest() {
+        this.tests.clear();
+    }
+
+    public int getSubmitTests() {
+        return this.submitTests;
+    }
+
+    public void setSubmitTests(int submitTests) {
+        this.submitTests = submitTests;
+    }
+
+    public double getTotalGrade() {
+        return this.totalGrade;
+    }
+
+    public void setTotalGrade(double totalGrade) {
+        this.totalGrade = totalGrade;
+    }
+
+    public double getTotalTest() {
+        return this.totalTest;
+    }
+
+    public void setTotalTest(double totalTest) {
+        this.totalTest = totalTest;
+    }
+    /* #endregion */
+
+    /* #region formatted variables for tables */
+    private String tableName;
+    private String tableId;
+    private String tableAssignments;
+    private String tableTests;
+    private String tableTestGrade;
+    private String tableOverallGrade;
+
+    public String getTableName() {
+        tableName = StudentTable.formatName(name);
+        return this.tableName;
+    }
+
+    public String getTableId() {
+        tableId = StudentTable.formatId(id);
+        return this.tableId;
+    }
+
+    public String getTableAssignments() {
+        tableAssignments = StudentTable.formatAssignments(assignments);
+        return this.tableAssignments;
+    }
+
+    public String getTableTests() {
+        tableTests = StudentTable.formatTests(tests);
+        return this.tableTests;
+    }
+
+    public String getTableTestGrade() {
+        tableTestGrade = StudentTable.formatTotalTest(totalTest);
+        return this.tableTestGrade;
+    }
+
+    public String getTableOverallGrade() {
+        tableOverallGrade = StudentTable.formatTotalMark(totalGrade);
+        return this.tableOverallGrade;
+    }
+    /* #endregion */
+}
+
+package vanduzee.objects;
+
+import java.time.LocalDate;
+
+import vanduzee.models.tableFormatting.*;
+
+public class Test extends Assessment {
+    public Test(String newName, double newTotal, double newWeight, LocalDate newDateDue) {
+        super(newName, newTotal, newWeight, newDateDue);
+    }
+
+    public Test(Assessment masterTest) {
+        super(masterTest);
+    }
+
+    @Override
+    public String getTableScore() {
+        return TestTable.formatScore(getScore(), getDaysLate());
+    }
+
+    @Override
+    public String getTablePercent() {
+        return TestTable.formatPercent(getScore(), getTotal(), getDaysLate());
+    }
+}
+
+package vanduzee;
+
+/* #region imports  */
+import java.io.IOException;
+import javafx.application.Application;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.*;
+import javafx.stage.Stage;
+import vanduzee.models.utility.*;
+/* #endregion */
+
+public class App extends Application {
+
+    private static Scene scene;
+
+    @Override
+    public void start(Stage stage) throws IOException {
+        scene = new Scene(loadFXML("/Dashboard_Student"));
+        stage.setScene(scene);
+        stage.show();
+    }
+
+    public static void setRoot(String fxml) throws IOException {
+        ManageConsole.clearConsole();
+        scene.setRoot(loadFXML(fxml));
+    }
+
+    private static Parent loadFXML(String fxml) throws IOException {
+        try {
+            FXMLLoader fxmlLoader = new FXMLLoader(App.class.getResource(fxml + ".fxml"));
+            return fxmlLoader.load();
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw e;
+        }
+    }
+
+    public static void main(String[] args) {
+        ManageConsole.clearConsole();
+        try {
+            launch(args);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+module vanduzee {
+    requires javafx.graphics;
+    requires javafx.controls;
+    requires javafx.fxml;
+
+    opens vanduzee to javafx.fxml;
+    opens vanduzee.controllers to javafx.fxml;
+    opens vanduzee.controllers.assignmentControllers to javafx.fxml;
+    opens vanduzee.controllers.studentControllers to javafx.fxml;
+    opens vanduzee.controllers.testControllers to javafx.fxml;
+
+    opens vanduzee.objects to javafx.base;
+
+    exports vanduzee;
+    exports vanduzee.controllers;
+    exports vanduzee.controllers.assignmentControllers;
+    exports vanduzee.controllers.studentControllers;
+    exports vanduzee.controllers.testControllers;
+
+    exports vanduzee.objects;
+}
